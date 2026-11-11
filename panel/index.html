@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>TermoDom – panel leadów</title>
+  <style>
+    :root {
+      --bg: #f5f7f6; --card: #fff; --ink: #1d2b24; --muted: #5b6b63; --line: #d9e1dc;
+      --brand: #1f7a4d; --hot: #c2410c; --hot-bg: #fff1e8; --cold: #2563a8; --cold-bg: #e8f1fb;
+      --demo: #fff4d6; --err: #b3261e;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+    header { background: var(--brand); color: #fff; padding: 14px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    header h1 { margin: 0; font-size: 18px; flex: 1; }
+    header button { background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.4); }
+    .demo-bar { background: var(--demo); color: #6b5200; padding: 8px 16px; font-size: 14px; display: none; }
+    main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+    button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+    button.primary { background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600; }
+    button:disabled { opacity: .6; cursor: wait; }
+    input, select, textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+    textarea { width: 100%; min-height: 90px; resize: vertical; }
+ 
+    /* logowanie */
+    #login { max-width: 380px; margin: 64px auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+    #login h2 { margin: 0 0 12px; font-size: 18px; }
+    #login input { width: 100%; margin-bottom: 12px; }
+    #login .row { display: flex; gap: 8px; }
+    #login .row button { flex: 1; }
+    .err { color: var(--err); font-size: 14px; min-height: 20px; margin-top: 8px; }
+ 
+    /* liczniki */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+    .stat b { display: block; font-size: 26px; }
+    .stat span { color: var(--muted); font-size: 13px; }
+ 
+    /* filtry */
+    .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+    .filters input { flex: 1; min-width: 180px; }
+ 
+    /* tabela */
+    .table-wrap { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th { font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); background: #fafbfa; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover { background: #f3f7f5; }
+    td.opis { white-space: normal; max-width: 260px; color: var(--muted); }
+    .empty { text-align: center; padding: 32px; color: var(--muted); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .badge.hot { background: var(--hot-bg); color: var(--hot); }
+    .badge.cold { background: var(--cold-bg); color: var(--cold); }
+    .badge.st { background: #eef1ef; color: var(--ink); font-weight: 500; }
+ 
+    /* karta leada */
+    dialog { border: 0; border-radius: 12px; padding: 0; width: min(560px, calc(100% - 32px)); }
+    dialog::backdrop { background: rgba(0,0,0,.4); }
+    .card-h { padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+    .card-h h3 { margin: 0; font-size: 18px; }
+    .card-b { padding: 16px 20px; }
+    .card-b dl { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; margin: 0 0 16px; }
+    .card-b dt { color: var(--muted); }
+    .card-b dd { margin: 0; overflow-wrap: anywhere; }
+    .card-b label { display: block; font-weight: 600; font-size: 13px; margin: 12px 0 4px; }
+    .card-b select, .card-b input { width: 100%; }
+    .card-f { padding: 12px 20px 16px; display: flex; justify-content: flex-end; gap: 8px; }
+    .x { background: none; border: 0; font-size: 22px; line-height: 1; padding: 0 4px; }
+    a.tel { color: var(--brand); font-weight: 600; }
+ 
+    @media (max-width: 640px) { .stats { grid-template-columns: 1fr 1fr 1fr; } .stat b { font-size: 20px; } th.hide-m, td.hide-m { display: none; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>TermoDom · Lead Inbox</h1>
+    <button id="refresh" hidden>Odśwież</button>
+    <button id="logout" hidden>Wyloguj</button>
+  </header>
+  <div class="demo-bar" id="demo-bar">Tryb demo: przykładowe dane, zmiany nie są zapisywane. <span id="demo-why"></span></div>
+ 
+  <section id="login">
+    <h2>Panel pracownika</h2>
+    <input id="token" type="password" placeholder="Token dostępu" autocomplete="off">
+    <div class="row">
+      <button class="primary" id="login-btn">Zaloguj</button>
+      <button id="demo-btn">Zobacz demo</button>
+    </div>
+    <div class="err" id="login-err"></div>
+  </section>
+ 
+  <main id="app" hidden>
+    <div class="stats">
+      <div class="stat"><b id="c-new">0</b><span>nowe</span></div>
+      <div class="stat"><b id="c-hot">0</b><span>gorące</span></div>
+      <div class="stat"><b id="c-cold">0</b><span>wystygłe</span></div>
+    </div>
+ 
+    <div class="filters">
+      <input id="f-q" type="search" placeholder="Szukaj: imię, miasto, telefon…">
+      <select id="f-status"><option value="">Wszystkie statusy</option></select>
+      <select id="f-produkt"><option value="">Wszystkie produkty</option></select>
+      <select id="f-temp">
+        <option value="">Każda temperatura</option>
+        <option value="gorący">Gorące</option>
+        <option value="zimny">Zimne</option>
+      </select>
+    </div>
+ 
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Temp.</th><th>Data</th><th>Imię</th><th>Miasto</th><th class="hide-m">Produkt</th><th>Status</th><th class="hide-m">Handlowiec</th><th class="hide-m">Opis</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+ 
+  <dialog id="card">
+    <div class="card-h">
+      <div><h3 id="k-imie"></h3><div id="k-badges"></div></div>
+      <button class="x" id="k-close" aria-label="Zamknij">×</button>
+    </div>
+    <div class="card-b">
+      <dl>
+        <dt>Telefon</dt><dd id="k-tel"></dd>
+        <dt>E-mail</dt><dd id="k-email"></dd>
+        <dt>Miasto</dt><dd id="k-miasto"></dd>
+        <dt>Produkt</dt><dd id="k-produkt"></dd>
+        <dt>Zgłoszenie</dt><dd id="k-data"></dd>
+        <dt>Gorący do</dt><dd id="k-goracy"></dd>
+        <dt>Opis</dt><dd id="k-opis"></dd>
+      </dl>
+      <label for="k-status">Status</label>
+      <select id="k-status"></select>
+      <label for="k-handlowiec">Handlowiec</label>
+      <input id="k-handlowiec" type="text" maxlength="100">
+      <label for="k-notatki">Notatki</label>
+      <textarea id="k-notatki" maxlength="2000"></textarea>
+      <div class="err" id="k-err"></div>
+    </div>
+    <div class="card-f">
+      <button id="k-cancel">Anuluj</button>
+      <button class="primary" id="k-save">Zapisz</button>
+    </div>
+  </dialog>
+ 
+  <script src="../config.js"></script>
+  <script>
+    const STATUSY = ['nowy', 'w kontakcie', 'audyt', 'oferta', 'wygrany', 'przegrany'];
+    const PRODUKTY = ['pompa ciepła', 'ocieplenie', 'okna', 'fotowoltaika', 'inne'];
+    const $ = id => document.getElementById(id);
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+ 
+    let leady = [];
+    let demo = false;
+    let token = '';
+    let aktywny = null;
+ 
+    // ---------- dane demo ----------
+    const dzien = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+    const DEMO = [
+      { imie: 'Katarzyna Nowak', telefon: '+48601234567', email: 'k.nowak@example.com', miasto: 'Kraków', produkt: 'pompa ciepła', opis: 'Dom 140 m², 1998 r., piec węglowy do wymiany przed zimą.', d: 0, status: 'nowy' },
+      { imie: 'Piotr Wiśniewski', telefon: '+48512345678', email: '', miasto: 'Wieliczka', produkt: 'fotowoltaika, pompa ciepła', opis: 'Chce PV 8 kW i pompę, pyta o dotację Czyste Powietrze.', d: -1, status: 'w kontakcie', handlowiec: 'Anna' },
+      { imie: 'Marta Zielińska', telefon: '+48698765432', email: 'marta.z@example.com', miasto: 'Skawina', produkt: 'ocieplenie', opis: 'Ocieplenie ścian 15 cm styropianu, dom 120 m².', d: -2, status: 'audyt', handlowiec: 'Tomasz', notatki: 'Audyt umówiony na piątek 10:00.' },
+      { imie: 'Andrzej Kowalczyk', telefon: '+48784512369', email: '', miasto: 'Niepołomice', produkt: 'okna', opis: '12 okien do wymiany, trzy szyby.', d: -3, status: 'oferta', handlowiec: 'Anna', notatki: 'Oferta wysłana 38 tys. zł.' },
+      { imie: 'Ewa Lewandowska', telefon: '+48533221144', email: 'ewa.l@example.com', miasto: 'Kraków', produkt: 'pompa ciepła, ocieplenie', opis: 'Kompleksowa termomodernizacja, budżet ok. 90 tys.', d: -4, status: 'wygrany', handlowiec: 'Tomasz', notatki: 'Umowa podpisana.' },
+      { imie: 'Grzegorz Kamiński', telefon: '+48609887766', email: '', miasto: 'Zabierzów', produkt: 'fotowoltaika', opis: 'Pyta tylko o cenę orientacyjną.', d: -9, status: 'nowy' },
+      { imie: 'Joanna Wójcik', telefon: '', email: 'j.wojcik@example.com', miasto: 'Myślenice', produkt: 'inne', opis: 'Rekuperacja w nowym domu.', d: -12, status: 'nowy' },
+      { imie: 'Tomasz Mazur', telefon: '+48722110099', email: 'mazur@example.com', miasto: 'Bochnia', produkt: 'okna, ocieplenie', opis: 'Termin realizacji: wiosna.', d: -15, status: 'przegrany', handlowiec: 'Anna', notatki: 'Wybrał tańszą ofertę.' },
+      { imie: 'Agnieszka Krawczyk', telefon: '+48500600700', email: '', miasto: 'Kraków', produkt: 'pompa ciepła', opis: 'Mieszkanie w kamienicy, czy da się zamontować?', d: 0, status: 'nowy' },
+      { imie: 'Michał Dąbrowski', telefon: '+48691234000', email: 'm.dabrowski@example.com', miasto: 'Wadowice', produkt: 'fotowoltaika', opis: 'Firma, hala 600 m², PV 40 kW.', d: -1, status: 'nowy' }
+    ].map((l, i) => {
+      const data = dzien(l.d);
+      const goracy_do = dzien(l.d + 7);
+      return {
+        id: i + 1, data: data + ' ' + String(9 + i).padStart(2, '0') + ':15', imie: l.imie, telefon: l.telefon, email: l.email,
+        miasto: l.miasto, produkt: l.produkt, opis: l.opis, goracy_do,
+        temperatura: l.status === 'nowy' && dzien(0) > goracy_do ? 'zimny' : (l.d < -7 ? 'zimny' : 'gorący'),
+        status: l.status, handlowiec: l.handlowiec || '', notatki: l.notatki || ''
+      };
+    });
+ 
+    // ---------- API ----------
+    // Tylko "proste" zapytania: POST form-urlencoded, bez własnych nagłówków (brak preflightu, brak strony ostrzegawczej ngrok)
+    async function api(path, fields, timeoutMs = 6000) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const res = await fetch(window.API_URL + path, { method: 'POST', body: new URLSearchParams(fields), signal: ctrl.signal });
+        const json = await res.json().catch(() => ({}));
+        return { status: res.status, json };
+      } finally { clearTimeout(t); }
+    }
+ 
+    function sortuj(lista) {
+      return lista.sort((a, b) =>
+        (b.temperatura === 'gorący') - (a.temperatura === 'gorący') || String(b.data).localeCompare(String(a.data)));
+    }
+ 
+    async function zaladuj() {
+      if (demo) { render(); return; }
+      $('refresh').disabled = true;
+      try {
+        const r = await api('/leads', { token });
+        if (r.status === 401) { wyloguj('Zły token.'); return; }
+        if (r.status !== 200 || !Array.isArray(r.json.leady)) throw new Error('HTTP ' + r.status);
+        leady = sortuj(r.json.leady);
+        render();
+      } catch (e) {
+        wlaczDemo('Backend jest offline (komputer z n8n wyłączony).');
+      } finally { $('refresh').disabled = false; }
+    }
+ 
+    // ---------- widok ----------
+    function filtrowane() {
+      const q = $('f-q').value.trim().toLowerCase();
+      const st = $('f-status').value, pr = $('f-produkt').value, tp = $('f-temp').value;
+      return leady.filter(l =>
+        (!st || l.status === st) &&
+        (!pr || String(l.produkt).split(',').map(s => s.trim()).includes(pr)) &&
+        (!tp || l.temperatura === tp) &&
+        (!q || [l.imie, l.miasto, l.telefon, l.email, l.opis].join(' ').toLowerCase().includes(q)));
+    }
+ 
+    const tempBadge = t => t === 'gorący' ? '<span class="badge hot">gorący</span>' : '<span class="badge cold">zimny</span>';
+ 
+    function render() {
+      $('c-new').textContent = leady.filter(l => l.status === 'nowy').length;
+      $('c-hot').textContent = leady.filter(l => l.temperatura === 'gorący').length;
+      $('c-cold').textContent = leady.filter(l => l.temperatura === 'zimny' && l.status === 'nowy').length;
+ 
+      const lista = filtrowane();
+      $('rows').innerHTML = lista.length ? lista.map(l => `
+        <tr data-id="${esc(l.id)}">
+          <td>${tempBadge(l.temperatura)}</td>
+          <td>${esc(l.data)}</td>
+          <td><b>${esc(l.imie)}</b></td>
+          <td>${esc(l.miasto)}</td>
+          <td class="hide-m">${esc(l.produkt)}</td>
+          <td><span class="badge st">${esc(l.status)}</span></td>
+          <td class="hide-m">${esc(l.handlowiec) || '–'}</td>
+          <td class="opis hide-m">${esc(String(l.opis).slice(0, 80))}${String(l.opis).length > 80 ? '…' : ''}</td>
+        </tr>`).join('') : '<tr><td colspan="8" class="empty">Brak leadów dla tych filtrów.</td></tr>';
+    }
+ 
+    function otworz(id) {
+      aktywny = leady.find(l => String(l.id) === String(id));
+      if (!aktywny) return;
+      const l = aktywny;
+      $('k-imie').textContent = l.imie || '(bez imienia)';
+      $('k-badges').innerHTML = tempBadge(l.temperatura) + ' <span class="badge st">' + esc(l.status) + '</span>';
+      $('k-tel').innerHTML = l.telefon ? `<a class="tel" href="tel:${esc(l.telefon)}">${esc(l.telefon)}</a>` : '–';
+      $('k-email').innerHTML = l.email ? `<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>` : '–';
+      $('k-miasto').textContent = l.miasto || '–';
+      $('k-produkt').textContent = l.produkt || '–';
+      $('k-data').textContent = l.data;
+      $('k-goracy').textContent = l.goracy_do;
+      $('k-opis').textContent = l.opis || '–';
+      $('k-status').value = l.status;
+      $('k-handlowiec').value = l.handlowiec || '';
+      $('k-notatki').value = l.notatki || '';
+      $('k-err').textContent = '';
+      $('card').showModal();
+    }
+ 
+    async function zapisz() {
+      const zmiana = { status: $('k-status').value, handlowiec: $('k-handlowiec').value.trim(), notatki: $('k-notatki').value.trim() };
+      if (!demo) {
+        $('k-save').disabled = true;
+        try {
+          const r = await api('/lead-update', { token, id: aktywny.id, ...zmiana });
+          if (r.status === 401) { $('card').close(); wyloguj('Sesja wygasła, zaloguj się ponownie.'); return; }
+          if (r.status !== 200 || !r.json.ok) { $('k-err').textContent = 'Nie udało się zapisać (' + r.status + ').'; return; }
+        } catch (e) {
+          $('k-err').textContent = 'Brak połączenia z serwerem.'; return;
+        } finally { $('k-save').disabled = false; }
+      }
+      Object.assign(aktywny, zmiana);
+      $('card').close();
+      render();
+    }
+ 
+    // ---------- tryby ----------
+    function pokazApp() {
+      $('login').hidden = true; $('app').hidden = false;
+      $('refresh').hidden = demo; $('logout').hidden = false;
+    }
+ 
+    function wlaczDemo(powod) {
+      demo = true;
+      leady = sortuj(DEMO.map(l => ({ ...l })));
+      $('demo-bar').style.display = 'block';
+      $('demo-why').textContent = powod || '';
+      pokazApp(); render();
+    }
+ 
+    function wyloguj(komunikat) {
+      try { localStorage.removeItem('leadInboxToken'); } catch (e) {}
+      token = ''; demo = false; leady = [];
+      $('demo-bar').style.display = 'none';
+      $('app').hidden = true; $('login').hidden = false;
+      $('refresh').hidden = true; $('logout').hidden = true;
+      $('login-err').textContent = komunikat || '';
+    }
+ 
+    async function zaloguj() {
+      token = $('token').value.trim();
+      if (!token) { $('login-err').textContent = 'Wpisz token.'; return; }
+      try { localStorage.setItem('leadInboxToken', token); } catch (e) {}
+      demo = false;
+      $('demo-bar').style.display = 'none';
+      pokazApp();
+      await zaladuj();
+    }
+ 
+    // ---------- zdarzenia ----------
+    STATUSY.forEach(s => {
+      $('f-status').add(new Option(s, s));
+      $('k-status').add(new Option(s, s));
+    });
+    PRODUKTY.forEach(p => $('f-produkt').add(new Option(p, p)));
+ 
+    ['f-q', 'f-status', 'f-produkt', 'f-temp'].forEach(id => $(id).addEventListener('input', render));
+    $('rows').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr) otworz(tr.dataset.id); });
+    $('login-btn').addEventListener('click', zaloguj);
+    $('token').addEventListener('keydown', e => { if (e.key === 'Enter') zaloguj(); });
+    $('demo-btn').addEventListener('click', () => wlaczDemo(''));
+    $('logout').addEventListener('click', () => wyloguj(''));
+    $('refresh').addEventListener('click', zaladuj);
+    $('k-close').addEventListener('click', () => $('card').close());
+    $('k-cancel').addEventListener('click', () => $('card').close());
+    $('k-save').addEventListener('click', zapisz);
+ 
+    // start: zapamiętany token → od razu ładuj
+    try { token = localStorage.getItem('leadInboxToken') || ''; } catch (e) {}
+    if (token) { pokazApp(); zaladuj(); }
+  </script>
+</body>
+</html>
+ 
